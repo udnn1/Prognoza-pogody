@@ -118,13 +118,15 @@ function sanitizeForecastHtml($html){
     $out=safePregReplace('/<p>\s*<\/p>/iu','',$out);$out=safePregReplace('/\n{3,}/',"\n\n",$out);return trim($out);
 }
 
-function formatTemperatureMatch($m){return isset($m[2])&&$m[2]!==''?formatTemperatureValue(((int)$m[1]+(int)$m[2])/2):$m[1].'°C';}
+function maxTemperaturePatterns(){return['/\b(?:temp\.?\s*)?max\.?[^\d-]{0,60}(-?\d{1,2})(?:\s*\/\s*(-?\d{1,2}))?(?:\s*°?\s*C|\s*st\.?\s*C?)/iu','/temperatur(?:a|y)?\s+maksymaln(?:a|ej|e)?[^\d-]{0,60}(-?\d{1,2})(?:\s*\/\s*(-?\d{1,2}))?(?:\s*°?\s*C|\s*st\.?\s*C?)/iu','/\bmaks(?:ymalna)?\.?[^\d-]{0,60}(-?\d{1,2})(?:\s*\/\s*(-?\d{1,2}))?(?:\s*°?\s*C|\s*st\.?\s*C?)/iu'];}
+function isTemperatureRangeMatch($m){return isset($m[2])&&$m[2]!=='';}
+function formatTemperatureMatch($m){return isTemperatureRangeMatch($m)?formatTemperatureValue(((int)$m[1]+(int)$m[2])/2):$m[1].'°C';}
 function extractTemperatureSnippet($text){
     $n=safePregReplace('/\s+/u',' ',(string)$text);$l=toLowercase($n);
     $drop=containsAnyKeyword($l,['spadnie','spadek','spadku','niższa','nizsza','ochłodzi','ochłodzenie','zimniej','zmniejszy']);
     $max=containsAnyKeyword($l,['maks','maksymaln','najwyższa','najwyzsza','max','najwyższa temp']);
     if($drop&&!$max)return'';
-    foreach(['/\b(?:temp\.?\s*)?max\.?[^\d-]{0,60}(-?\d{1,2})(?:\s*\/\s*(-?\d{1,2}))?(?:\s*°?\s*C|\s*st\.?\s*C?)/iu','/temperatur(?:a|y)?\s+maksymaln(?:a|ej|e)?[^\d-]{0,60}(-?\d{1,2})(?:\s*\/\s*(-?\d{1,2}))?(?:\s*°?\s*C|\s*st\.?\s*C?)/iu','/\bmaks(?:ymalna)?\.?[^\d-]{0,60}(-?\d{1,2})(?:\s*\/\s*(-?\d{1,2}))?(?:\s*°?\s*C|\s*st\.?\s*C?)/iu']as$p)if(preg_match($p,$n,$m)===1)return formatTemperatureMatch($m);
+    foreach(maxTemperaturePatterns()as$p)if(preg_match($p,$n,$m)===1)return formatTemperatureMatch($m);
     if(preg_match('/(?<!\d)(-?\d{1,2})\s*\/\s*(-?\d{1,2})(?:\s*°?\s*C|\s*st\.?\s*C?)?/iu',$n,$m)===1&&!containsAnyKeyword($l,['rano','nad ranem','temp. rano','min','minimaln','w nocy','nocą','minimalna temp','temperatura minimalna']))return formatTemperatureValue(((int)$m[1]+(int)$m[2])/2);
     return'';
 }
@@ -133,6 +135,7 @@ function formatTemperatureValue($v){$r=round((float)$v,1);return abs($r-round($r
 function extractTemperatureBadge($text){
     $n=safePregReplace('/\s+/u',' ',(string)$text);$l=toLowercase($n);
     if(preg_match('/(?<!\d)(-?\d{1,2})\s*\/\s*(-?\d{1,2})(?:\s*°?\s*C|\s*st\.?\s*C?)?/iu',$n,$m)===1&&!containsAnyKeyword($l,['rano','nad ranem','temp. rano','min','minimaln','w nocy','nocą']))return['value'=>formatTemperatureValue(((int)$m[1]+(int)$m[2])/2),'label'=>'śr.'];
+    foreach(maxTemperaturePatterns()as$p)if(preg_match($p,$n,$m)===1)return['value'=>formatTemperatureMatch($m),'label'=>isTemperatureRangeMatch($m)?'śr.':'maks.'];
     $v=extractTemperatureSnippet($text);return$v===''?['value'=>'','label'=>'']:['value'=>$v,'label'=>'maks.'];
 }
 
