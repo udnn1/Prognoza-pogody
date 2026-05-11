@@ -1,11 +1,15 @@
-# Pogoda dla Śląska
+<h1 align="center">Pogoda dla Śląska</h1>
 
-![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
-![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?logo=bootstrap&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-CDN-38BDF8?logo=tailwindcss&logoColor=white)
-![Telegram](https://img.shields.io/badge/Telegram-Bot_API-26A5E4?logo=telegram&logoColor=white)
+<p align="center">
+  <img alt="PHP" src="https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white">
+  <img alt="Bootstrap" src="https://img.shields.io/badge/Bootstrap-5.3-7952B3?logo=bootstrap&logoColor=white">
+  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-CDN-38BDF8?logo=tailwindcss&logoColor=white">
+  <img alt="Telegram" src="https://img.shields.io/badge/Telegram-Bot_API-26A5E4?logo=telegram&logoColor=white">
+</p>
 
-Nowoczesna, responsywna aplikacja PHP prezentująca 3-dniową prognozę pogody dla Śląska na podstawie publicznego kanału RSS serwisu [pogodadlaslaska.pl](https://pogodadlaslaska.pl).
+<p align="center">
+  Nowoczesna, responsywna aplikacja PHP prezentująca 3-dniową prognozę pogody dla Śląska na podstawie publicznego kanału RSS serwisu <a href="https://pogodadlaslaska.pl">pogodadlaslaska.pl</a>.
+</p>
 
 ## Najważniejsze funkcje
 
