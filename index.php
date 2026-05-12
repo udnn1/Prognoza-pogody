@@ -247,19 +247,42 @@ function buildForecastDay($title,$bodyHtml,$analysisText=null){
 }
 
 function extractForecastSections($content){
-    $content=normalizeSourceHtml($content);$pattern='/<strong\b[^>]*>\s*((?:<[^>]+>\s*)*(?:PONIEDZIAŁEK|WTOREK|ŚRODA|CZWARTEK|PIĄTEK|SOBOTA|NIEDZIELA|NOC|W NOCY)(?:(?!<\/strong>).)*)<\/strong>/isu';
+    $content=normalizeSourceHtml($content);
+    $pattern='/<strong\b[^>]*>\s*((?:<[^>]+>\s*)*(?:PONIEDZIAŁEK|WTOREK|ŚRODA|CZWARTEK|PIĄTEK|SOBOTA|NIEDZIELA|NOC|W NOCY)(?:(?!<\/strong>).)*)<\/strong>/isu';
     $count=preg_match_all($pattern,$content,$m,PREG_OFFSET_CAPTURE);
-    if(!$count){$days=ensureMondayDay($content,extractPlainDaySections($content));return$days!==[]?['intro'=>'','days'=>$days]:['intro'=>sanitizeForecastHtml($content),'days'=>[]];}
-    $introRaw=substr($content,0,$m[0][0][1]);$days=[];$intro=sanitizeForecastHtml($introRaw);$introText=extractLeadForecastText(trim(strip_tags($intro)));
-    $leading=detectLeadingDayTitle($introText);$first=isset($m[1][0][0])?toLowercase((string)strip_tags($m[1][0][0])):'';$leadNorm=$leading!==null?toLowercase($leading):'';
-    if($leading!==null&&$introText!==''&&!($first!==''&&strpos($first,$leadNorm)!==false)){if(($d=buildForecastDay($leading,$intro))!==null)$days[]=$d;}
-    elseif($leading!==null&&$introText!==''&&$first!==''&&strpos($first,$leadNorm)!==false)$introRaw='';
-    for($i=0;$i<$count;$i++){
-        $full=$m[0][$i][0];$title=trim(strip_tags($m[1][$i][0]));$start=$m[0][$i][1]+strlen($full);$end=$i<$count-1?$m[0][$i+1][1]:strlen($content);
-        $bodyRaw=substr($content,$start,$end-$start);$bodyRaw=safePregReplace('/^\s*<\/p>\s*/iu','',$bodyRaw);if(preg_match('/^\s*(?:&(?:#8211|ndash);|–|-|:)?\s*[^<\s]/iu',$bodyRaw)===1)$bodyRaw='<p>'.$bodyRaw;$bodyRaw=safePregReplace('/^\s*(<p\b[^>]*>)?\s*(?:&(?:#8211|ndash);|–|-|:)\s*/iu','$1',$bodyRaw,1);
-        $body=sanitizeForecastHtml($bodyRaw);if($title===''||$body==='')continue;if(($d=buildForecastDay($title,$body))!==null)$days[]=$d;
+
+    if(!$count){
+        $days=extractPlainDaySections($content);
+        return$days!==[]?['intro'=>'','days'=>$days]:['intro'=>sanitizeForecastHtml($content),'days'=>[]];
     }
-    return['intro'=>sanitizeForecastHtml($introRaw),'days'=>ensureMondayDay($content,$days)];
+
+    $introRaw=substr($content,0,$m[0][0][1]);
+    $days=[];
+
+    for($i=0;$i<$count;$i++){
+        $full=$m[0][$i][0];
+        $title=trim(strip_tags($m[1][$i][0]));
+        $start=$m[0][$i][1]+strlen($full);
+        $end=$i<$count-1?$m[0][$i+1][1]:strlen($content);
+
+        $bodyRaw=substr($content,$start,$end-$start);
+        $bodyRaw=safePregReplace('/^\s*<\/p>\s*/iu','',$bodyRaw);
+
+        if(preg_match('/^\s*(?:&(?:#8211|ndash);|–|-|:)?\s*[^<\s]/iu',$bodyRaw)===1){
+            $bodyRaw='<p>'.$bodyRaw;
+        }
+
+        $bodyRaw=safePregReplace('/^\s*(<p\b[^>]*>)?\s*(?:&(?:#8211|ndash);|–|-|:)\s*/iu','$1',$bodyRaw,1);
+        $body=sanitizeForecastHtml($bodyRaw);
+
+        if($title===''||$body==='')continue;
+
+        if(($d=buildForecastDay($title,$body))!==null){
+            $days[]=$d;
+        }
+    }
+
+    return['intro'=>sanitizeForecastHtml($introRaw),'days'=>$days];
 }
 
 function extractPlainDaySections($content){
