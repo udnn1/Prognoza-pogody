@@ -393,9 +393,14 @@ function buildParsedForecastFingerprint($dateDisplay,$intro,$forecastDays){
 }
 
 function normalizeForecastTitleForTelegram($title){
-    $title=trim((string)$title);
-    if(preg_match('/^(.*?)\s*\[([^\]]+)\]\s*$/u',$title,$m)===1)return trim($m[1]).' ('.trim($m[2]).')';
+    $title=trim(html_entity_decode((string)$title,ENT_QUOTES|ENT_HTML5,'UTF-8'));
+    if(preg_match('/^(.*?)\s*\[([^\]]+)\]\s*(?:[–—\-:]\s*.+)?$/u',$title,$m)===1)return trim($m[1]).' ('.trim($m[2]).')';
     return$title;
+}
+function extractTitleNoteForTelegram($title){
+    $title=trim(html_entity_decode((string)$title,ENT_QUOTES|ENT_HTML5,'UTF-8'));
+    if(preg_match('/^.*?\[([^\]]+)\]\s*[–—\-:]\s*(.+)$/u',$title,$m)===1)return trim($m[2]);
+    return'';
 }
 
 
@@ -460,9 +465,11 @@ function buildTelegramParsedForecastMessage($dateDisplay,$intro,$forecastDays){
 
         foreach($forecastDays as$day){
             $title=normalizeForecastTitleForTelegram($day['title']??'');
+            $titleNote=extractTitleNoteForTelegram($day['title']??'');
             $theme=trim((string)($day['theme']['label']??''));
             $temperature=trim((string)($day['temperature']??''));
             $content=plainTextFromHtml($day['content']??'');
+            if($titleNote!=='')$content=$titleNote.' – '.$content;
 
             $header='➡️ '.$title;
             $details=[];
@@ -2747,7 +2754,7 @@ main.container {
 </div>
 <div class="forecast-rail" aria-label="Pozioma lista prognoz"><div class="forecast-list">
 <?php foreach($forecastDays as$index=>$day): ?>
-<?php $dayContentId='day-note-'.(int)$index;$temperatureBadge=extractTemperatureBadge(strip_tags($day['content']));if($temperatureBadge['value']===''&&isset($day['temperature'])&&$day['temperature']!=='')$temperatureBadge=['value'=>(string)$day['temperature'],'label'=>'maks.'];$displayTitle=(string)$day['title'];$displayDate='';if(preg_match('/^(.*?)\s*\[([^\]]+)\]\s*$/u',$displayTitle,$titleParts)===1){$displayTitle=trim($titleParts[1]);$displayDate=trim($titleParts[2]);} ?>
+<?php $dayContentId='day-note-'.(int)$index;$temperatureBadge=extractTemperatureBadge(strip_tags($day['content']));if($temperatureBadge['value']===''&&isset($day['temperature'])&&$day['temperature']!=='')$temperatureBadge=['value'=>(string)$day['temperature'],'label'=>'maks.'];$displayTitle=html_entity_decode((string)$day['title'],ENT_QUOTES|ENT_HTML5,'UTF-8');$displayDate='';$titleNote='';if(preg_match('/^(.*?)\s*\[([^\]]+)\]\s*(?:[–\-:]\s*(.+))?$/u',$displayTitle,$titleParts)===1){$displayTitle=trim($titleParts[1]);$displayDate=trim($titleParts[2]);$titleNote=isset($titleParts[3])?trim($titleParts[3]):'';} ?>
 <article id="day-<?php echo(int)$index; ?>" class="forecast-card border <?php echo $day['theme']['surface_classes']; ?>" data-forecast-card>
 <div class="forecast-card-inner p-4 sm:p-5">
 <div class="flex items-start justify-between gap-3"><div class="forecast-icon inline-flex items-center justify-center <?php echo $day['theme']['panel_classes']; ?> shadow-lg"><?php echo renderForecastIcon($day['theme']['icon'],'h-7 w-7'); ?></div>
@@ -2761,7 +2768,7 @@ main.container {
 </div>
 <?php if($day['signals']!==[]): ?><div class="mt-4 flex flex-wrap gap-2"><?php foreach($day['signals']as$signal): ?><span class="inline-flex items-center gap-2 rounded-full px-3 py-2 text-[12px] font-bold <?php echo $signal['classes']; ?> shadow-sm"><?php echo renderForecastIcon($signal['icon'],'h-4 w-4'); ?><?php echo escape($signal['label']); ?></span><?php endforeach; ?></div><?php endif; ?>
 <button type="button" class="forecast-toggle mt-4" data-forecast-toggle data-label-open="Ukryj opis" data-label-closed="Pokaż opis" aria-controls="<?php echo escape($dayContentId); ?>" aria-expanded="false"><span data-forecast-toggle-label>Pokaż opis</span><span class="forecast-toggle-icon" aria-hidden="true"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" /></svg></span></button>
-<div id="<?php echo escape($dayContentId); ?>" class="forecast-copy forecast-copy-panel mt-4 grow rounded-[24px] border border-white/80 bg-white/76 px-4 py-4 text-slate-700 shadow-inner shadow-slate-100/70 sm:px-5"><?php echo capitalizeFirstVisibleLetterInHtml($day['content']); ?></div>
+<div id="<?php echo escape($dayContentId); ?>" class="forecast-copy forecast-copy-panel mt-4 grow rounded-[24px] border border-white/80 bg-white/76 px-4 py-4 text-slate-700 shadow-inner shadow-slate-100/70 sm:px-5"><?php $displayContent=$day['content'];if($titleNote!=='')$displayContent=preg_replace('/^(\s*<p\b[^>]*>)/iu','$1<strong>'.escape($titleNote).'</strong> – ',$displayContent,1);echo capitalizeFirstVisibleLetterInHtml($displayContent); ?></div>
 </div></article>
 <?php endforeach; ?>
 </div></div></section>
