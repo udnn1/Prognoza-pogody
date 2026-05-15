@@ -159,6 +159,16 @@ function hasExplicitNoRainSignal($text){
 
 function hasRainSignal($text){$n=toLowercase($text);if(preg_match('/\bbez\s+opad(?:ó|o)w\b/u',$n)===1||preg_match('/\bbrak\s+opad(?:ó|o)w\b/u',$n)===1)return false;return containsAnyKeyword($n,['opady deszczu','deszcz','mżawk','mzawk','ulew']);}
 function hasNoPrecipitationSignal($text){$n=toLowercase($text);return preg_match('/\bbez\s+opad(?:ó|o)w\b/u',$n)===1||preg_match('/\bbrak\s+opad(?:ó|o)w\b/u',$n)===1;}
+function removeNonLocalForecastContext($text){
+    $text=(string)$text;$resume='(?=\b(?:nadal|temperatura|wiatr|ciśnienie|cisnienie)\b|\btemp\.?\s|$)';
+    $nonLocal='(?:na\s+wschodzie(?:\s+polski)?|nad\s+morzem|poza\s+regionem|w\s+innych\s+regionach)';
+    foreach([
+        '/\bjako\s+ciekawostk(?:ę|e)\s+dodam,?\s+(?:że|ze)\b.*?'.$resume.'/isu',
+        '/\bw\s+tym\s+samym\s+czasie\b(?=.*?\b'.$nonLocal.'\b).*?'.$resume.'/isu',
+        '/\b'.$nonLocal.'\b.*?'.$resume.'/isu'
+    ]as$p)$text=safePregReplace($p,' ',$text);
+    return trim(safePregReplace('/\s+/u',' ',$text));
+}
 function hasCloudIncreaseToLargeSignal($text){$n=toLowercase($text);return preg_match('/\bzachmurzenie[^.!?]{0,140}\b(?:wzrośnie|wzrosnie|wzrastające|wzrastajace|wzrastać|wzrastac|zwiększy\s+się|zwiekszy\s+sie)[^.!?]{0,140}\b(?:do\s+)?(?:dużego|duzego|duże|duze|znacznego|większego|wiekszego)\b/u',$n)===1||preg_match('/\b(?:duże|duze|dużego|duzego|znaczne|większe|wieksze)\s+zachmurzenie\b/u',$n)===1;}
 function hasClearSkySignal($text){$n=toLowercase($text);return preg_match('/\b(bezchmurn(?:e|ie|ego|ym)|niemal\s+bezchmurn(?:e|ie)|niebo\s+bez\s+chmur)\b/u',$n)===1;}
 function hasLimitedCloudIncreaseSignal($text){$n=toLowercase($text);return preg_match('/\bzachmurzenie[^.!?]{0,100}\b(?:wzrośnie|wzrosnie|wzrastające|wzrastajace|wzrastać|wzrastac|zwiększy\s+się|zwiekszy\s+sie)[^.!?]{0,100}\b(?:najwyżej|najwyzej|maksymalnie|tylko)?[^.!?]{0,40}\bdo\s+mał(?:ego|e|ym)\b/u',$n)===1;}
@@ -170,8 +180,8 @@ function hasStrongMorningSunSignal($text){return containsAnyKeyword(toLowercase(
 function hasLessSunSignal($text){$n=toLowercase($text);if(hasLimitedCloudIncreaseSignal($n))return false;return containsAnyKeyword($n,['mniej słońca','mniej slonca','mniej rozpogodzeń','mniej rozpogodzen','mało słońca','malo slonca','zachmurzenie wzrośnie','zachmurzenie wzrosnie','więcej chmur','wiecej chmur','bez słońca','bez slonca']);}
 
 function getForecastTheme($text){
-    $n=toLowercase($text);$no=hasNoPrecipitationSignal($n)||hasExplicitNoRainSignal($n);$clear=hasClearSkySignal($n);$storm=containsAnyKeyword($n,['burz','piorun']);$morning=hasStrongMorningSunSignal($n);
-    if((hasPositiveSunSignal($n)&&!hasLessSunSignal($n)&&!$storm)||($morning&&!$storm))return getSunnyForecastTheme();
+    $n=toLowercase($text);$local=removeNonLocalForecastContext($n);$no=hasNoPrecipitationSignal($local)||hasExplicitNoRainSignal($local);$clear=hasClearSkySignal($local);$storm=containsAnyKeyword($local,['burz','piorun']);$morning=hasStrongMorningSunSignal($local);$rain=!$no&&hasRainSignal($local);
+    if(!$rain&&((hasPositiveSunSignal($local)&&!hasLessSunSignal($local)&&!$storm)||($morning&&!$storm)))return getSunnyForecastTheme();
     $themes=[
         ['keywords'=>['burz','piorun'],'icon'=>'storm','label'=>'Burzowo','panel_classes'=>'bg-indigo-500 text-white shadow-indigo-500/25','chip_classes'=>'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200','surface_classes'=>'border-indigo-200/70 bg-indigo-50/55','accent_classes'=>'from-indigo-500 via-violet-500 to-sky-500'],
         ['keywords'=>['przymrozk','przymrozek'],'icon'=>'temp-low','label'=>'Przymrozek','panel_classes'=>'bg-cyan-500 text-white shadow-cyan-500/25','chip_classes'=>'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200','surface_classes'=>'border-cyan-200/70 bg-cyan-50/60','accent_classes'=>'from-cyan-500 via-sky-500 to-blue-500'],
@@ -184,8 +194,8 @@ function getForecastTheme($text){
     ];
     foreach($themes as$t){
         if($no&&$t['icon']==='rain')continue;if($clear&&in_array($t['icon'],['rain','storm','fog'],true))continue;
-        if($t['icon']==='snow'){foreach(['słońc','slonc','słonecz','slonecz','pogodn','bezchmurn','słonecznie','slonecznie']as$sk)if(strpos($n,$sk)!==false)continue 2;}
-        foreach($t['keywords']as$k)if(strpos($n,$k)!==false)return$t;
+        if($t['icon']==='snow'){foreach(['słońc','slonc','słonecz','slonecz','pogodn','bezchmurn','słonecznie','slonecznie']as$sk)if(strpos($local,$sk)!==false)continue 2;}
+        foreach(($t['keywords']??[])as$k)if(strpos($local,$k)!==false)return$t;
     }
     return['icon'=>'cloud','label'=>'Zmienne warunki','panel_classes'=>'bg-slate-600 text-white shadow-slate-500/20','chip_classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200','surface_classes'=>'border-slate-200/70 bg-white/72','accent_classes'=>'from-slate-500 via-slate-400 to-sky-400'];
 }
@@ -194,27 +204,27 @@ function deduplicateSignals($signals){$seen=[];$out=[];foreach($signals as$s){$k
 function getSunnySignals(){return[['icon'=>'trend-up','label'=>'Trend: poprawa','classes'=>'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200'],['icon'=>'sun','label'=>'Słonecznie','classes'=>'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200']];}
 
 function getForecastSignals($text,$theme){
-    $n=toLowercase(removeBoilerplateText($text));$no=hasNoPrecipitationSignal($n)||hasExplicitNoRainSignal($n);$clear=hasClearSkySignal($n);$lowCloud=hasLowCloudSignal($n);$signals=[];$morning=hasStrongMorningSunSignal($n);
-    $sunny=$morning||(hasPositiveSunSignal($n)&&!hasLessSunSignal($n));
+    $n=toLowercase(removeBoilerplateText($text));$local=removeNonLocalForecastContext($n);$no=hasNoPrecipitationSignal($local)||hasExplicitNoRainSignal($local);$clear=hasClearSkySignal($local);$lowCloud=hasLowCloudSignal($local);$signals=[];$morning=hasStrongMorningSunSignal($local);$rain=!$no&&hasRainSignal($local);$storm=containsAnyKeyword($local,['burz','piorun']);
+    $sunny=!$rain&&!$storm&&($morning||(hasPositiveSunSignal($local)&&!hasLessSunSignal($local)));
     if($sunny){foreach(getSunnySignals()as$s)$signals[]=$s;}
-    elseif(containsAnyKeyword($n,['ociepl','cieplej','wzrost temperatur','coraz cieplej','wyzsza temperatur','wyższa temperatur'])){
+    elseif(containsAnyKeyword($local,['ociepl','cieplej','wzrost temperatur','coraz cieplej','wyzsza temperatur','wyższa temperatur'])){
         $signals[]=['icon'=>'trend-up','label'=>'Trend: wzrost','classes'=>'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200'];
         $signals[]=['icon'=>'temp-high','label'=>'Ocieplenie','classes'=>'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200'];
-    }elseif(containsAnyKeyword($n,['ochłod','ochlod','chłodniej','chlodniej','spadek temperatur','zimniej'])){
+    }elseif(containsAnyKeyword($local,['ochłod','ochlod','chłodniej','chlodniej','spadek temperatur','zimniej'])){
         $signals[]=['icon'=>'trend-down','label'=>'Trend: spadek','classes'=>'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200'];
         $signals[]=['icon'=>'temp-low','label'=>'Ochłodzenie','classes'=>'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200'];
     }else{
         $signals[]=['icon'=>'trend-stable','label'=>'Trend: stabilnie','classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200'];
-        if(containsAnyKeyword($n,['bez zmian','stabilnie','stabilizacja','temperatura bez zmian','temperatura stabilna']))$signals[]=['icon'=>'trend-stable','label'=>'Stabilnie','classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200'];
+        if(containsAnyKeyword($local,['bez zmian','stabilnie','stabilizacja','temperatura bez zmian','temperatura stabilna']))$signals[]=['icon'=>'trend-stable','label'=>'Stabilnie','classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200'];
     }
     $signals[]=['icon'=>$theme['icon'],'label'=>$theme['label'],'classes'=>$theme['chip_classes']];
     if($no)$signals[]=['icon'=>'cloud','label'=>'Bez opadów','classes'=>'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200'];
     if($clear)$signals[]=['icon'=>'sun','label'=>'Bezchmurnie','classes'=>'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200'];
     elseif($lowCloud)$signals[]=['icon'=>'cloud','label'=>'Małe zachmurzenie','classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200'];
-    if(!$no&&$theme['icon']!=='rain'&&hasRainSignal($text))$signals[]=['icon'=>'rain','label'=>'Opady deszczu','classes'=>'bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200'];
-    if($theme['icon']!=='wind'&&containsAnyKeyword($n,['silny wiatr','mocniejszy wiatr','poryw','wietrz','wichur']))$signals[]=['icon'=>'wind','label'=>'Silniejszy wiatr','classes'=>'bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-200'];
-    if(containsAnyKeyword($n,['upal','upał','goraco','gorąco','cieplo','ciepło','wysoka temperatur']))$signals[]=['icon'=>'temp-high','label'=>'Wyraźnie cieplej','classes'=>'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200'];
-    elseif(containsAnyKeyword($n,['mroz','mróz','przymrozk','zimno','chlodno','chłodno']))$signals[]=['icon'=>'temp-low','label'=>'Chłodno','classes'=>'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200'];
+    if(!$no&&$theme['icon']!=='rain'&&hasRainSignal($local))$signals[]=['icon'=>'rain','label'=>'Opady deszczu','classes'=>'bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200'];
+    if($theme['icon']!=='wind'&&containsAnyKeyword($local,['silny wiatr','mocniejszy wiatr','poryw','wietrz','wichur']))$signals[]=['icon'=>'wind','label'=>'Silniejszy wiatr','classes'=>'bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-200'];
+    if(containsAnyKeyword($local,['upal','upał','goraco','gorąco','cieplo','ciepło','wysoka temperatur']))$signals[]=['icon'=>'temp-high','label'=>'Wyraźnie cieplej','classes'=>'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200'];
+    elseif(containsAnyKeyword($local,['mroz','mróz','przymrozk','zimno','chlodno','chłodno']))$signals[]=['icon'=>'temp-low','label'=>'Chłodno','classes'=>'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200'];
     return array_slice(deduplicateSignals($signals),0,5);
 }
 
@@ -222,7 +232,8 @@ function ensureSunnyThursdayLabels($days){
     foreach($days as$i=>$d){
         $title=(string)($d['title']??'');$content=(string)($d['content']??'');$analysis=(string)($d['analysis_text']??'');
         $h=toLowercase($title.' '.strip_tags($content).' '.strip_tags($analysis));if(strpos($h,'czwartek')===false)continue;
-        $morning=hasStrongMorningSunSignal($h);if(!$morning&&(!hasPositiveSunSignal($h)||hasLessSunSignal($h)))continue;
+        $local=removeNonLocalForecastContext($h);$no=hasNoPrecipitationSignal($local)||hasExplicitNoRainSignal($local);if(!$no&&hasRainSignal($local))continue;
+        $morning=hasStrongMorningSunSignal($local);if(!$morning&&(!hasPositiveSunSignal($local)||hasLessSunSignal($local)))continue;
         $days[$i]['theme']=getSunnyForecastTheme();$forced=getSunnySignals();$existing=isset($d['signals'])&&is_array($d['signals'])?$d['signals']:[];
         foreach($existing as$s){$label=(string)($s['label']??'');if($label==='Słonecznie'||strpos($label,'Trend:')===0)continue;$forced[]=$s;}
         $days[$i]['signals']=array_slice(deduplicateSignals($forced),0,5);
