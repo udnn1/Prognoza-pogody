@@ -173,8 +173,11 @@ function hasCloudIncreaseToLargeSignal($text){$n=toLowercase($text);return preg_
 function hasClearSkySignal($text){$n=toLowercase($text);return preg_match('/\b(bezchmurn(?:e|ie|ego|ym)|niemal\s+bezchmurn(?:e|ie)|niebo\s+bez\s+chmur)\b/u',$n)===1;}
 function hasLimitedCloudIncreaseSignal($text){$n=toLowercase($text);return preg_match('/\bzachmurzenie[^.!?]{0,100}\b(?:wzrośnie|wzrosnie|wzrastające|wzrastajace|wzrastać|wzrastac|zwiększy\s+się|zwiekszy\s+sie)[^.!?]{0,100}\b(?:najwyżej|najwyzej|maksymalnie|tylko)?[^.!?]{0,40}\bdo\s+mał(?:ego|e|ym)\b/u',$n)===1;}
 function hasLowCloudSignal($text){$n=toLowercase($text);if(hasCloudIncreaseToLargeSignal($n))return false;return preg_match('/\bmał(?:e|e\s+i\s+umiarkowane)?\s+zachmurzenie\b/u',$n)===1||preg_match('/\bzachmurzenie[^.!?]{0,100}\b(?:początkowo\s+)?mał(?:e|ego|ym)\b/u',$n)===1||hasLimitedCloudIncreaseSignal($n);}
+function hasCloudinessSignal($text){$n=toLowercase($text);if(hasClearSkySignal($n)||hasLowCloudSignal($n))return false;$cloudWords='(?:całkowit[\p{L}]*|calkowit[\p{L}]*|duż[\p{L}]*|duz[\p{L}]*|znaczn[\p{L}]*|umiarkowan[\p{L}]*|umiarkowan[\p{L}]*\s+i\s+duż[\p{L}]*|umiarkowan[\p{L}]*\s+i\s+duz[\p{L}]*)';return hasCloudIncreaseToLargeSignal($n)||preg_match('/\bzachmurzenie[^.!?]{0,120}\b'.$cloudWords.'\b/u',$n)===1||preg_match('/\b'.$cloudWords.'\s+zachmurzenie\b/u',$n)===1||containsAnyKeyword($n,['pochmurno','pochmurnie','pochmurny','chmurno','przewaga chmur','z przewagą chmur','z przewaga chmur','dużo chmur','duzo chmur','sporo chmur','więcej chmur','wiecej chmur']);}
+function hasCloudSignal($text){return hasLowCloudSignal($text)||hasCloudinessSignal($text);}
 
 function getSunnyForecastTheme(){return['icon'=>'sun','label'=>'Słonecznie','panel_classes'=>'bg-amber-500 text-white shadow-amber-500/25','chip_classes'=>'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200','surface_classes'=>'border-amber-200/70 bg-amber-50/60','accent_classes'=>'from-amber-400 via-orange-400 to-yellow-300'];}
+function getCloudyForecastTheme(){return['keywords'=>['zachmurzenie','pochmurn','chmurno','chmur'],'icon'=>'cloud','label'=>'Zachmurzenie','panel_classes'=>'bg-slate-600 text-white shadow-slate-500/20','chip_classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200','surface_classes'=>'border-slate-200/70 bg-white/72','accent_classes'=>'from-slate-500 via-slate-400 to-sky-400'];}
 function hasPositiveSunSignal($text){return containsAnyKeyword(toLowercase($text),['od rana słonecznie','od rana slonecznie','słonecznie od rana','slonecznie od rana','od rana słoneczny','od rana sloneczny','od rana słoneczna','od rana sloneczna','od rana słoneczne','od rana sloneczne','będzie od rana słoneczny','bedzie od rana sloneczny','będzie od rana słoneczna','bedzie od rana sloneczna','będzie od rana słoneczne','bedzie od rana sloneczne','słoneczny','sloneczny','słoneczna','sloneczna','słoneczne','sloneczne','słonecznie','slonecznie','dużo słońca','duzo slonca','sporo słońca','sporo slonca','więcej słońca','wiecej slonca','rozpogodzenia','pogodnie','bezchmurnie','słońce','slonce','słonecz','slonecz','słońc','slonc']);}
 function hasStrongMorningSunSignal($text){return containsAnyKeyword(toLowercase($text),['od rana słonecznie','od rana slonecznie','słonecznie od rana','slonecznie od rana','rano słonecznie','rano slonecznie','od rana słoneczny','od rana sloneczny','od rana słoneczna','od rana sloneczna','od rana słoneczne','od rana sloneczne','będzie od rana słoneczny','bedzie od rana sloneczny','będzie od rana słoneczna','bedzie od rana sloneczna','będzie od rana słoneczne','bedzie od rana sloneczne','od rana dużo słońca','od rana duzo slonca','od rana sporo słońca','od rana sporo slonca','od rana pogodnie','pogodnie od rana']);}
 function hasLessSunSignal($text){$n=toLowercase($text);if(hasLimitedCloudIncreaseSignal($n))return false;return containsAnyKeyword($n,['mniej słońca','mniej slonca','mniej rozpogodzeń','mniej rozpogodzen','mało słońca','malo slonca','zachmurzenie wzrośnie','zachmurzenie wzrosnie','więcej chmur','wiecej chmur','bez słońca','bez slonca']);}
@@ -187,6 +190,7 @@ function getForecastTheme($text){
         ['keywords'=>['przymrozk','przymrozek'],'icon'=>'temp-low','label'=>'Przymrozek','panel_classes'=>'bg-cyan-500 text-white shadow-cyan-500/25','chip_classes'=>'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200','surface_classes'=>'border-cyan-200/70 bg-cyan-50/60','accent_classes'=>'from-cyan-500 via-sky-500 to-blue-500'],
         ['keywords'=>['śnieg','snieg','marzną','mróz','mroz','szron'],'icon'=>'snow','label'=>'Śnieg lub mróz','panel_classes'=>'bg-cyan-500 text-white shadow-cyan-500/25','chip_classes'=>'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200','surface_classes'=>'border-cyan-200/70 bg-cyan-50/60','accent_classes'=>'from-cyan-400 via-sky-400 to-slate-400'],
         ['keywords'=>['deszcz','opad','ulew','mżawk','mzawk'],'icon'=>'rain','label'=>'Opady','panel_classes'=>'bg-sky-500 text-white shadow-sky-500/25','chip_classes'=>'bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200','surface_classes'=>'border-sky-200/70 bg-sky-50/60','accent_classes'=>'from-sky-500 via-blue-500 to-cyan-500'],
+        getCloudyForecastTheme(),
         ['keywords'=>['wiatr','wietrz','wichur'],'icon'=>'wind','label'=>'Wietrznie','panel_classes'=>'bg-teal-500 text-white shadow-teal-500/25','chip_classes'=>'bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-200','surface_classes'=>'border-teal-200/70 bg-teal-50/60','accent_classes'=>'from-teal-500 via-emerald-500 to-cyan-500'],
         ['keywords'=>['mgł','mgl','zamglen'],'icon'=>'fog','label'=>'Mglisto','panel_classes'=>'bg-slate-500 text-white shadow-slate-500/25','chip_classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200','surface_classes'=>'border-slate-200/70 bg-slate-50/65','accent_classes'=>'from-slate-500 via-slate-400 to-zinc-400'],
         getSunnyForecastTheme(),
@@ -194,6 +198,7 @@ function getForecastTheme($text){
     ];
     foreach($themes as$t){
         if($no&&$t['icon']==='rain')continue;if($clear&&in_array($t['icon'],['rain','storm','fog'],true))continue;
+        if($t['icon']==='cloud'&&!hasCloudSignal($local))continue;
         if($t['icon']==='snow'){foreach(['słońc','slonc','słonecz','slonecz','pogodn','bezchmurn','słonecznie','slonecznie']as$sk)if(strpos($local,$sk)!==false)continue 2;}
         foreach(($t['keywords']??[])as$k)if(strpos($local,$k)!==false)return$t;
     }
@@ -204,7 +209,7 @@ function deduplicateSignals($signals){$seen=[];$out=[];foreach($signals as$s){$k
 function getSunnySignals(){return[['icon'=>'trend-up','label'=>'Trend: poprawa','classes'=>'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200'],['icon'=>'sun','label'=>'Słonecznie','classes'=>'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200']];}
 
 function getForecastSignals($text,$theme){
-    $n=toLowercase(removeBoilerplateText($text));$local=removeNonLocalForecastContext($n);$no=hasNoPrecipitationSignal($local)||hasExplicitNoRainSignal($local);$clear=hasClearSkySignal($local);$lowCloud=hasLowCloudSignal($local);$signals=[];$morning=hasStrongMorningSunSignal($local);$rain=!$no&&hasRainSignal($local);$storm=containsAnyKeyword($local,['burz','piorun']);
+    $n=toLowercase(removeBoilerplateText($text));$local=removeNonLocalForecastContext($n);$no=hasNoPrecipitationSignal($local)||hasExplicitNoRainSignal($local);$clear=hasClearSkySignal($local);$lowCloud=hasLowCloudSignal($local);$cloudy=hasCloudinessSignal($local);$signals=[];$morning=hasStrongMorningSunSignal($local);$rain=!$no&&hasRainSignal($local);$storm=containsAnyKeyword($local,['burz','piorun']);
     $sunny=!$rain&&!$storm&&($morning||(hasPositiveSunSignal($local)&&!hasLessSunSignal($local)));
     if($sunny){foreach(getSunnySignals()as$s)$signals[]=$s;}
     elseif(containsAnyKeyword($local,['ociepl','cieplej','wzrost temperatur','coraz cieplej','wyzsza temperatur','wyższa temperatur'])){
@@ -221,6 +226,7 @@ function getForecastSignals($text,$theme){
     if($no)$signals[]=['icon'=>'cloud','label'=>'Bez opadów','classes'=>'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200'];
     if($clear)$signals[]=['icon'=>'sun','label'=>'Bezchmurnie','classes'=>'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200'];
     elseif($lowCloud)$signals[]=['icon'=>'cloud','label'=>'Małe zachmurzenie','classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200'];
+    elseif($cloudy)$signals[]=['icon'=>'cloud','label'=>'Zachmurzenie','classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200'];
     if(!$no&&$theme['icon']!=='rain'&&hasRainSignal($local))$signals[]=['icon'=>'rain','label'=>'Opady deszczu','classes'=>'bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200'];
     if($theme['icon']!=='wind'&&containsAnyKeyword($local,['silny wiatr','mocniejszy wiatr','poryw','wietrz','wichur']))$signals[]=['icon'=>'wind','label'=>'Silniejszy wiatr','classes'=>'bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-200'];
     if(containsAnyKeyword($local,['upal','upał','goraco','gorąco','cieplo','ciepło','wysoka temperatur']))$signals[]=['icon'=>'temp-high','label'=>'Wyraźnie cieplej','classes'=>'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200'];
@@ -389,11 +395,7 @@ function buildParsedForecastFingerprint($dateDisplay,$intro,$forecastDays){
     foreach($forecastDays as$day){
         $signals=[];
 
-        if(isset($day['signals'])&&is_array($day['signals'])){
-            foreach($day['signals']as$signal){
-                $signals[]=(string)($signal['label']??'');
-            }
-        }
+        foreach(getForecastDisplaySignals($day)as$signal)$signals[]=(string)($signal['label']??'');
 
         $payload['days'][]=[
             'title'=>(string)($day['title']??''),
