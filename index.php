@@ -3,6 +3,8 @@ declare(strict_types=1);
 const RSS_URL='https://pogodadlaslaska.pl/blog/prognoza-krotkoterminowa/rss';
 const APP_TITLE='Pogoda dla Śląska - 3 dniowa';
 const TELEGRAM_STATE_FILE=__DIR__.'/telegram_weather_state.json';
+const FORECAST_SNAPSHOT_FILE=__DIR__.'/forecast_snapshot.json';
+const FORECAST_SNAPSHOT_VERSION=4;
 
 function envValue($name,$default=''){
     $v=getenv($name);
@@ -175,6 +177,7 @@ function hasLimitedCloudIncreaseSignal($text){$n=toLowercase($text);return preg_
 function hasLowCloudSignal($text){$n=toLowercase($text);if(hasCloudIncreaseToLargeSignal($n))return false;return preg_match('/\bmał(?:e|e\s+i\s+umiarkowane)?\s+zachmurzenie\b/u',$n)===1||preg_match('/\bzachmurzenie[^.!?]{0,100}\b(?:początkowo\s+)?mał(?:e|ego|ym)\b/u',$n)===1||hasLimitedCloudIncreaseSignal($n);}
 function hasCloudinessSignal($text){$n=toLowercase($text);if(hasClearSkySignal($n)||hasLowCloudSignal($n))return false;$cloudWords='(?:całkowit[\p{L}]*|calkowit[\p{L}]*|duż[\p{L}]*|duz[\p{L}]*|znaczn[\p{L}]*|umiarkowan[\p{L}]*|umiarkowan[\p{L}]*\s+i\s+duż[\p{L}]*|umiarkowan[\p{L}]*\s+i\s+duz[\p{L}]*)';return hasCloudIncreaseToLargeSignal($n)||preg_match('/\bzachmurzenie[^.!?]{0,120}\b'.$cloudWords.'\b/u',$n)===1||preg_match('/\b'.$cloudWords.'\s+zachmurzenie\b/u',$n)===1||containsAnyKeyword($n,['pochmurno','pochmurnie','pochmurny','chmurno','przewaga chmur','z przewagą chmur','z przewaga chmur','dużo chmur','duzo chmur','sporo chmur','więcej chmur','wiecej chmur']);}
 function hasCloudSignal($text){return hasLowCloudSignal($text)||hasCloudinessSignal($text);}
+function hasWindySignal($text){$n=toLowercase($text);return containsAnyKeyword($n,['silny wiatr','mocny wiatr','porywist','porywy','poryw wiatru','wichur','halny','sztorm','huragan','wietrznie','wietrzny','wietrzna','wietrzne'])||preg_match('/\bwiatr\b[^.!?]{0,40}\b(?:bardzo\s+)?(?:do(?:ść|sc)\s+)?siln[\p{L}]*\b/u',$n)===1||preg_match('/\b(?:bardzo\s+)?(?:do(?:ść|sc)\s+)?siln[\p{L}]*\b[^.!?]{0,20}\bwiatr\b/u',$n)===1;}
 
 function getSunnyForecastTheme(){return['icon'=>'sun','label'=>'Słonecznie','panel_classes'=>'bg-amber-500 text-white shadow-amber-500/25','chip_classes'=>'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200','surface_classes'=>'border-amber-200/70 bg-amber-50/60','accent_classes'=>'from-amber-400 via-orange-400 to-yellow-300'];}
 function getCloudyForecastTheme(){return['keywords'=>['zachmurzenie','pochmurn','chmurno','chmur'],'icon'=>'cloud','label'=>'Zachmurzenie','panel_classes'=>'bg-slate-600 text-white shadow-slate-500/20','chip_classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200','surface_classes'=>'border-slate-200/70 bg-white/72','accent_classes'=>'from-slate-500 via-slate-400 to-sky-400'];}
@@ -193,16 +196,20 @@ function getForecastTheme($text){
         getCloudyForecastTheme(),
         ['keywords'=>['wiatr','wietrz','wichur'],'icon'=>'wind','label'=>'Wietrznie','panel_classes'=>'bg-teal-500 text-white shadow-teal-500/25','chip_classes'=>'bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-200','surface_classes'=>'border-teal-200/70 bg-teal-50/60','accent_classes'=>'from-teal-500 via-emerald-500 to-cyan-500'],
         ['keywords'=>['mgł','mgl','zamglen'],'icon'=>'fog','label'=>'Mglisto','panel_classes'=>'bg-slate-500 text-white shadow-slate-500/25','chip_classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200','surface_classes'=>'border-slate-200/70 bg-slate-50/65','accent_classes'=>'from-slate-500 via-slate-400 to-zinc-400'],
-        getSunnyForecastTheme(),
-        ['keywords'=>['noc','wieczor','w nocy'],'icon'=>'moon','label'=>'Noc','panel_classes'=>'bg-violet-500 text-white shadow-violet-500/25','chip_classes'=>'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200','surface_classes'=>'border-violet-200/70 bg-violet-50/60','accent_classes'=>'from-violet-500 via-fuchsia-500 to-indigo-500']
+        getSunnyForecastTheme()
     ];
     foreach($themes as$t){
         if($no&&$t['icon']==='rain')continue;if($clear&&in_array($t['icon'],['rain','storm','fog'],true))continue;
-        if($t['icon']==='cloud'&&!hasCloudSignal($local))continue;
+        if($t['icon']==='cloud'&&!hasCloudinessSignal($local))continue;
+        if($t['icon']==='wind'&&!hasWindySignal($local))continue;
         if($t['icon']==='snow'){foreach(['słońc','slonc','słonecz','slonecz','pogodn','bezchmurn','słonecznie','slonecznie']as$sk)if(strpos($local,$sk)!==false)continue 2;}
         foreach(($t['keywords']??[])as$k)if(strpos($local,$k)!==false)return$t;
     }
-    return['icon'=>'cloud','label'=>'Zmienne warunki','panel_classes'=>'bg-slate-600 text-white shadow-slate-500/20','chip_classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200','surface_classes'=>'border-slate-200/70 bg-white/72','accent_classes'=>'from-slate-500 via-slate-400 to-sky-400'];
+    if(containsAnyKeyword($local,['ociepl','cieplej','wzrost temperatur','coraz cieplej','wyzsza temperatur','wyższa temperatur']))
+        return['icon'=>'temp-high','label'=>'Ocieplenie','panel_classes'=>'bg-orange-500 text-white shadow-orange-500/25','chip_classes'=>'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200','surface_classes'=>'border-orange-200/70 bg-orange-50/60','accent_classes'=>'from-orange-400 via-amber-400 to-yellow-300'];
+    if(containsAnyKeyword($local,['ochłod','ochlod','chłodniej','chlodniej','spadek temperatur','zimniej']))
+        return['icon'=>'temp-low','label'=>'Ochłodzenie','panel_classes'=>'bg-cyan-500 text-white shadow-cyan-500/25','chip_classes'=>'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200','surface_classes'=>'border-cyan-200/70 bg-cyan-50/60','accent_classes'=>'from-cyan-500 via-sky-500 to-blue-500'];
+    return['icon'=>'trend-stable','label'=>'Stabilnie','panel_classes'=>'bg-slate-600 text-white shadow-slate-500/20','chip_classes'=>'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200','surface_classes'=>'border-slate-200/70 bg-white/72','accent_classes'=>'from-slate-500 via-slate-400 to-sky-400'];
 }
 
 function deduplicateSignals($signals){$seen=[];$out=[];foreach($signals as$s){$k=strtolower((string)($s['icon']??'').'|'.(string)($s['label']??''));if(isset($seen[$k]))continue;$seen[$k]=true;$out[]=$s;}return$out;}
@@ -387,6 +394,32 @@ function saveTelegramState($state){
     $json=json_encode($state,JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT);
     if($json===false)return false;
     return file_put_contents(TELEGRAM_STATE_FILE,$json,LOCK_EX)!==false;
+}
+
+function saveForecastSnapshot($dateDisplay,$intro,$forecastDays){
+    $json=json_encode([
+        'version'=>FORECAST_SNAPSHOT_VERSION,
+        'saved_at'=>date(DATE_ATOM),
+        'date_display'=>(string)$dateDisplay,
+        'intro'=>(string)$intro,
+        'days'=>array_values($forecastDays)
+    ],JSON_UNESCAPED_UNICODE);
+    if($json===false)return false;
+    return file_put_contents(FORECAST_SNAPSHOT_FILE,$json,LOCK_EX)!==false;
+}
+
+function loadForecastSnapshot(){
+    if(!is_file(FORECAST_SNAPSHOT_FILE))return null;
+    $raw=file_get_contents(FORECAST_SNAPSHOT_FILE);
+    if($raw===false||trim($raw)==='')return null;
+    $data=json_decode($raw,true);
+    if(!is_array($data)||!isset($data['days'])||!is_array($data['days']))return null;
+    if((int)($data['version']??0)!==FORECAST_SNAPSHOT_VERSION)return null;
+    return[
+        'date_display'=>(string)($data['date_display']??'brak daty'),
+        'intro'=>(string)($data['intro']??''),
+        'days'=>array_values($data['days'])
+    ];
 }
 
 function buildParsedForecastFingerprint($dateDisplay,$intro,$forecastDays){
@@ -638,6 +671,7 @@ function handleTelegramParsedForecastNotification($dateDisplay,$intro,$forecastD
             'last_checked_at'=>date(DATE_ATOM),
             'last_sent_at'=>null
         ]);
+        saveForecastSnapshot($dateDisplay,$intro,$forecastDays);
 
         echo'Pierwsze uruchomienie: zapisano aktualny stan bez wysyłki.'.PHP_EOL;
         echo'Test wysyłki: php index.php --telegram --force'.PHP_EOL;
@@ -657,6 +691,7 @@ function handleTelegramParsedForecastNotification($dateDisplay,$intro,$forecastD
         'last_checked_at'=>date(DATE_ATOM),
         'last_sent_at'=>date(DATE_ATOM)
     ]);
+    saveForecastSnapshot($dateDisplay,$intro,$forecastDays);
 
     echo'Wysłano sparsowaną prognozę na Telegram.'.PHP_EOL;
     exit(0);
@@ -676,10 +711,17 @@ else{
     }
 }
 $forecastDays=ensureSunnyThursdayLabels($forecastDays);
-$hasIntro=hasForecastDisplayIntro($intro);
 if(isTelegramNotifyMode()){
     handleTelegramParsedForecastNotification($dateDisplay,$intro,$forecastDays,$errorMessage);
 }
+$snapshot=loadForecastSnapshot();
+if($snapshot!==null&&$snapshot['days']!==[]){
+    $dateDisplay=$snapshot['date_display'];
+    $intro=$snapshot['intro'];
+    $forecastDays=$snapshot['days'];
+    $errorMessage=null;
+}
+$hasIntro=hasForecastDisplayIntro($intro);
 $faviconSvg=<<<SVG
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
     <defs>
