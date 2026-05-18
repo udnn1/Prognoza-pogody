@@ -3,8 +3,6 @@ declare(strict_types=1);
 const RSS_URL='https://pogodadlaslaska.pl/blog/prognoza-krotkoterminowa/rss';
 const APP_TITLE='Pogoda dla Śląska - 3 dniowa';
 const TELEGRAM_STATE_FILE=__DIR__.'/telegram_weather_state.json';
-const FORECAST_SNAPSHOT_FILE=__DIR__.'/forecast_snapshot.json';
-const FORECAST_SNAPSHOT_VERSION=4;
 
 function envValue($name,$default=''){
     $v=getenv($name);
@@ -396,32 +394,6 @@ function saveTelegramState($state){
     return file_put_contents(TELEGRAM_STATE_FILE,$json,LOCK_EX)!==false;
 }
 
-function saveForecastSnapshot($dateDisplay,$intro,$forecastDays){
-    $json=json_encode([
-        'version'=>FORECAST_SNAPSHOT_VERSION,
-        'saved_at'=>date(DATE_ATOM),
-        'date_display'=>(string)$dateDisplay,
-        'intro'=>(string)$intro,
-        'days'=>array_values($forecastDays)
-    ],JSON_UNESCAPED_UNICODE);
-    if($json===false)return false;
-    return file_put_contents(FORECAST_SNAPSHOT_FILE,$json,LOCK_EX)!==false;
-}
-
-function loadForecastSnapshot(){
-    if(!is_file(FORECAST_SNAPSHOT_FILE))return null;
-    $raw=file_get_contents(FORECAST_SNAPSHOT_FILE);
-    if($raw===false||trim($raw)==='')return null;
-    $data=json_decode($raw,true);
-    if(!is_array($data)||!isset($data['days'])||!is_array($data['days']))return null;
-    if((int)($data['version']??0)!==FORECAST_SNAPSHOT_VERSION)return null;
-    return[
-        'date_display'=>(string)($data['date_display']??'brak daty'),
-        'intro'=>(string)($data['intro']??''),
-        'days'=>array_values($data['days'])
-    ];
-}
-
 function buildParsedForecastFingerprint($dateDisplay,$intro,$forecastDays){
     $payload=['date'=>$dateDisplay,'intro'=>getForecastDisplayIntroText($intro),'days'=>[]];
 
@@ -671,7 +643,6 @@ function handleTelegramParsedForecastNotification($dateDisplay,$intro,$forecastD
             'last_checked_at'=>date(DATE_ATOM),
             'last_sent_at'=>null
         ]);
-        saveForecastSnapshot($dateDisplay,$intro,$forecastDays);
 
         echo'Pierwsze uruchomienie: zapisano aktualny stan bez wysyłki.'.PHP_EOL;
         echo'Test wysyłki: php index.php --telegram --force'.PHP_EOL;
@@ -691,7 +662,6 @@ function handleTelegramParsedForecastNotification($dateDisplay,$intro,$forecastD
         'last_checked_at'=>date(DATE_ATOM),
         'last_sent_at'=>date(DATE_ATOM)
     ]);
-    saveForecastSnapshot($dateDisplay,$intro,$forecastDays);
 
     echo'Wysłano sparsowaną prognozę na Telegram.'.PHP_EOL;
     exit(0);
@@ -711,17 +681,10 @@ else{
     }
 }
 $forecastDays=ensureSunnyThursdayLabels($forecastDays);
+$hasIntro=hasForecastDisplayIntro($intro);
 if(isTelegramNotifyMode()){
     handleTelegramParsedForecastNotification($dateDisplay,$intro,$forecastDays,$errorMessage);
 }
-$snapshot=loadForecastSnapshot();
-if($snapshot!==null&&$snapshot['days']!==[]){
-    $dateDisplay=$snapshot['date_display'];
-    $intro=$snapshot['intro'];
-    $forecastDays=$snapshot['days'];
-    $errorMessage=null;
-}
-$hasIntro=hasForecastDisplayIntro($intro);
 $faviconSvg=<<<SVG
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
     <defs>
