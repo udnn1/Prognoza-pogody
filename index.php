@@ -56,7 +56,9 @@ function extractItemContent($item){
 function normalizeSourceHtml($html){
     $html=str_replace(['&nbsp;',"\xc2\xa0"],' ',(string)$html);$html=safePregReplace('/<img\b[^>]*>/iu','',$html);
     foreach(['/<p\b[^>]*>\s*Zaproś mnie na wirtualną kawę.*?<\/p>/isu','/<p\b[^>]*>\s*Wszelkie materiały przedstawione na stronie.*?<\/p>/isu','/<p\b[^>]*>\s*Prognoza została przygotowana przez.*?<\/p>/isu','/<p\b[^>]*>\s*Czy\s+w\s+kolejnych\s+dniach\s+wróci\s+wyższa\s+temperatura\?.*?<\/p>/isu','/<p\b[^>]*>\s*Zapraszam\s+na\s+najnowszą\s+kilkudniową\s+prognozę\.?\s*<\/p>/isu','/<p\b[^>]*>\s*Wolałbym\s+mieć\s+dla\s+Was\s+cieplejsze\s+prognozy.*?postawienia\s+wirtualnej\s+KAWKI\s*<\/p>/isu']as$p)$html=safePregReplace($p,'',$html);
+    $html=safePregReplace('/<p\b[^>]*>(?:(?!<\/p>).)*?Jeśli moje prognozy pomagają.*$/isu','',$html);
     $html=safePregReplace('/Jeśli moje prognozy pomagają.*$/isu','',$html);
+    $html=safePregReplace('/<p\b[^>]*>(?:(?!<\/p>).)*?Wszelkie materiały \(teksty, grafiki, zdjęcia.*$/isu','',$html);
     $html=safePregReplace('/Wszelkie materiały \(teksty, grafiki, zdjęcia.*$/isu','',$html);
     return trim($html);
 }
@@ -144,10 +146,39 @@ function extractLeadForecastText($text){
     foreach(preg_split('/\n\s*\n+/u',$text)?:[$text]as$p){$c=safePregReplace('/\s+/u',' ',trim($p));if($c!=='')return$c;}return'';
 }
 
+function isForecastBoilerplateText($text){
+    $t=trim((string)$text);if($t==='')return true;
+    $clean=trim(removeBoilerplateText($t));if($clean==='')return true;
+    $len=function_exists('mb_strlen')?mb_strlen($t,'UTF-8'):strlen($t);
+    $cleanLen=function_exists('mb_strlen')?mb_strlen($clean,'UTF-8'):strlen($clean);
+    if($cleanLen<$len*0.5)return true;
+    return containsAnyKeyword(toLowercase($t),['wirtualnej kawki','wirtualną kawkę','wirtualna kawka','buycoffee','postaw mi kaw','postawienia wirtualnej','zapraszam na najnowsz','zapraszam na kilkudniow','wszelkie materiały','jeśli moje prognozy pomag','obserwuj mnie na','wesprzyj autora','znajdziesz mnie na','drogie czytelni','drodzy czytelni','drogi czytelni','droga czytelni']);
+}
+
+function extractForecastBodyText($text){
+    $text=str_replace(["\r\n","\r"],"\n",trim((string)$text));if($text==='')return'';
+    $kept=[];
+    foreach(preg_split('/\n\s*\n+/u',$text)?:[$text]as$p){
+        $c=safePregReplace('/\s+/u',' ',trim($p));if($c==='')continue;
+        if($kept!==[]&&isForecastBoilerplateText($c))break;
+        $kept[]=$c;if(count($kept)>=4)break;
+    }
+    return implode("\n\n",$kept);
+}
+
 function extractLeadForecastHtml($html){
     $html=trim((string)$html);if($html==='')return'';
-    if(preg_match_all('/<p\b[^>]*>.*?<\/p>/isu',$html,$ps)===1||!empty($ps[0]))foreach($ps[0]as$p)if(trim(strip_tags($p))!=='')return trim($p);
-    $t=extractLeadForecastText(html_entity_decode(strip_tags(str_replace(['<br>','<br/>','<br />'],["\n","\n","\n"],$html)),ENT_QUOTES,'UTF-8'));
+    if(preg_match_all('/<p\b[^>]*>.*?<\/p>/isu',$html,$ps)>=1&&!empty($ps[0])){
+        $kept=[];
+        foreach($ps[0]as$p){
+            $plain=trim(html_entity_decode(strip_tags((string)$p),ENT_QUOTES,'UTF-8'));
+            if($plain==='')continue;
+            if($kept!==[]&&isForecastBoilerplateText($plain))break;
+            $kept[]=trim((string)$p);if(count($kept)>=4)break;
+        }
+        if($kept!==[])return implode("\n",$kept);
+    }
+    $t=extractForecastBodyText(html_entity_decode(strip_tags(str_replace(['<br>','<br/>','<br />'],["\n","\n","\n"],$html)),ENT_QUOTES,'UTF-8'));
     return$t===''?'':'<p>'.nl2br(escape($t)).'</p>';
 }
 
@@ -324,7 +355,7 @@ function extractTextDaySections($content){
     $count=preg_match_all($pattern,$text,$m,PREG_OFFSET_CAPTURE);if(!$count)return[];$days=[];
     for($i=0;$i<$count;$i++){
         $title=trim($m[1][$i][0].($m[2][$i][0]??''));$full=$m[0][$i][0];$off=$m[0][$i][1];$start=$off+strpos($full,$title)+strlen($title);$start+=strspn(substr($text,$start)," \t\n\r\0\x0B-–:");$end=$i<$count-1?$m[0][$i+1][1]:strlen($text);
-        $bodyText=extractLeadForecastText(trim(substr($text,$start,$end-$start)));if($title===''||$bodyText==='')continue;$body='<p>'.nl2br(escape($bodyText)).'</p>';if(($d=buildForecastDay($title,$body,$bodyText))!==null)$days[]=$d;
+        $bodyText=extractForecastBodyText(trim(substr($text,$start,$end-$start)));if($title===''||$bodyText==='')continue;$body='<p>'.nl2br(escape($bodyText)).'</p>';if(($d=buildForecastDay($title,$body,$bodyText))!==null)$days[]=$d;
     }
     return$days;
 }
