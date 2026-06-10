@@ -292,7 +292,7 @@ function buildForecastDay($title,$bodyHtml,$analysisText=null){
     $lead=extractLeadForecastText(strip_tags($content));if($source==='')$source=$lead;if($title===''||$content===''||$source==='')return null;
     $filterSource=$lead!==''?$lead:$source;
     $l=toLowercase($filterSource);
-    $night=containsAnyKeyword($l,['przymrozki','przymrozek','mrozowisk','mroz','mróz','szron','w nocy','nocą','nad ranem','przed świtem','temp. rano','minimaln','temperatura spadnie','marzną','zamarznięte','zamarzniete','mroźnie','mroznie'])||preg_match('/\bspadnie\s+do\s+-?\d{1,2}\s*(?:°?\s*c|st\.?\s*c?)\b/u',$l)===1;
+    $night=containsAnyKeyword($l,['przymrozki','przymrozek','mrozowisk','mroz','mróz','szron','w nocy','nocą','nad ranem','przed świtem','temp. rano','temp. minimaln','temperatura minimaln','minimalna temp','minimalnej temp','temperatura spadnie','marzną','zamarznięte','zamarzniete','mroźnie','mroznie'])||preg_match('/\bspadnie\s+do\s+-?\d{1,2}\s*(?:°?\s*c|st\.?\s*c?)\b/u',$l)===1;
     $day=containsAnyKeyword($l,['słońc','slonc','słonecz','slonecz','bezchmurn','słonecznie','slonecznie','słoneczny','sloneczny','słoneczna','sloneczna','słoneczne','sloneczne','od rana słonecznie','od rana slonecznie','od rana słoneczny','od rana sloneczny','w dzień','w ciągu dnia','podczas dnia','w ciągu doby']);
     if(!$day&&isNightOnlyForecastText($title.' '.$filterSource))return null;if($night&&!$day)return null;
     $analysis=$title.' '.$filterSource;$theme=getForecastTheme($analysis);
