@@ -283,13 +283,27 @@ function ensureSunnyThursdayLabels($days){
     return$days;
 }
 
+function limitForecastDaysToWindow($days,$maxDays=3){
+    if(!is_array($days)||$days===[])return$days;
+    $today=new DateTimeImmutable('today');$kept=[];
+    foreach($days as$d){
+        if(preg_match('/\[\s*(\d{1,2})\.(\d{1,2})\.(\d{4})\s*\]/u',(string)($d['title']??''),$m)===1){
+            $date=DateTimeImmutable::createFromFormat('!d.m.Y',sprintf('%02d.%02d.%04d',(int)$m[1],(int)$m[2],(int)$m[3]));
+            if($date instanceof DateTimeImmutable&&$date<$today)continue;
+        }
+        $kept[]=$d;
+    }
+    if($kept===[])$kept=$days;
+    return array_slice($kept,0,$maxDays);
+}
+
 function buildForecastDay($title,$bodyHtml,$analysisText=null){
     $title=safePregReplace('/\s+/u',' ',trim((string)$title));if(preg_match('/^noc\b/iu',$title)===1)return null;
     $content=capitalizeFirstVisibleLetterInHtml(extractLeadForecastHtml($bodyHtml));
     $plain=html_entity_decode(strip_tags(str_replace(['<br>','<br/>','<br />','</p>'],["\n","\n","\n","\n\n"],(string)$bodyHtml)),ENT_QUOTES,'UTF-8');
     $plain=removeBoilerplateText(safePregReplace('/\s+/u',' ',trim($plain)));
     $source=$analysisText===null?$plain:removeBoilerplateText(safePregReplace('/\s+/u',' ',trim((string)$analysisText)));
-    $lead=extractLeadForecastText(strip_tags($content));if($source==='')$source=$lead;if($title===''||$content===''||$source==='')return null;
+    $lead=extractLeadForecastText(plainTextFromHtml($content));if($source==='')$source=$lead;if($title===''||$content===''||$source==='')return null;
     $filterSource=$lead!==''?$lead:$source;
     $l=toLowercase($filterSource);
     $night=containsAnyKeyword($l,['przymrozki','przymrozek','mrozowisk','mroz','mróz','szron','w nocy','nocą','nad ranem','przed świtem','temp. rano','temp. minimaln','temperatura minimaln','minimalna temp','minimalnej temp','temperatura spadnie','marzną','zamarznięte','zamarzniete','mroźnie','mroznie'])||preg_match('/\bspadnie\s+do\s+-?\d{1,2}\s*(?:°?\s*c|st\.?\s*c?)\b/u',$l)===1;
@@ -712,6 +726,7 @@ else{
     }
 }
 $forecastDays=ensureSunnyThursdayLabels($forecastDays);
+$forecastDays=limitForecastDaysToWindow($forecastDays);
 $hasIntro=hasForecastDisplayIntro($intro);
 if(isTelegramNotifyMode()){
     handleTelegramParsedForecastNotification($dateDisplay,$intro,$forecastDays,$errorMessage);
