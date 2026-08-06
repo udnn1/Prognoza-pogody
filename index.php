@@ -54,7 +54,7 @@ function extractItemContent($item){
 }
 
 function normalizeSourceHtml($html){
-    $html=str_replace(['&nbsp;',"\xc2\xa0"],' ',(string)$html);$html=safePregReplace('/<img\b[^>]*>/iu','',$html);
+    $html=str_replace(['&nbsp;',"\xc2\xa0"],' ',(string)$html);$html=safePregReplace('/<img\b[^>]*>/iu',' ',$html);
     foreach(['/<p\b[^>]*>\s*Zaproś mnie na wirtualną kawę.*?<\/p>/isu','/<p\b[^>]*>\s*Wszelkie materiały przedstawione na stronie.*?<\/p>/isu','/<p\b[^>]*>\s*Prognoza została przygotowana przez.*?<\/p>/isu','/<p\b[^>]*>\s*Czy\s+w\s+kolejnych\s+dniach\s+wróci\s+wyższa\s+temperatura\?.*?<\/p>/isu','/<p\b[^>]*>\s*Zapraszam\s+na\s+najnowszą\s+kilkudniową\s+prognozę\.?\s*<\/p>/isu','/<p\b[^>]*>\s*Wolałbym\s+mieć\s+dla\s+Was\s+cieplejsze\s+prognozy.*?postawienia\s+wirtualnej\s+KAWKI\s*<\/p>/isu']as$p)$html=safePregReplace($p,'',$html);
     $html=safePregReplace('/<p\b[^>]*>(?:(?!<\/p>).)*?Jeśli moje prognozy pomagają.*$/isu','',$html);
     $html=safePregReplace('/Jeśli moje prognozy pomagają.*$/isu','',$html);
@@ -99,13 +99,16 @@ function ensureMondayDay($content,$days){
 }
 
 function pruneHtmlNode($node){
-    $allowed=['br'=>true,'em'=>true,'li'=>true,'ol'=>true,'p'=>true,'strong'=>true,'ul'=>true];$children=[];
+    $allowed=['a'=>true,'br'=>true,'em'=>true,'li'=>true,'ol'=>true,'p'=>true,'strong'=>true,'ul'=>true];$children=[];
     foreach($node->childNodes as$c)$children[]=$c;foreach($children as$c)pruneHtmlNode($c);
     if($node instanceof DOMComment){if($node->parentNode)$node->parentNode->removeChild($node);return;}
     if(!($node instanceof DOMElement))return;
+    $tag=strtolower($node->tagName);$href=$tag==='a'?trim((string)$node->getAttribute('href')):'';
     while($node->attributes->length>0){$a=$node->attributes->item(0);if($a!==null)$node->removeAttributeNode($a);}
-    if(strtolower($node->tagName)==='div'||isset($allowed[strtolower($node->tagName)]))return;
+    if($tag==='a'){if(preg_match('#^https?://#i',$href)===1){$node->setAttribute('href',$href);$node->setAttribute('target','_blank');$node->setAttribute('rel','noopener noreferrer');return;}}
+    elseif($tag==='div'||isset($allowed[$tag]))return;
     $p=$node->parentNode;if(!($p instanceof DOMNode))return;
+    if($node->firstChild===null)$p->insertBefore($node->ownerDocument->createTextNode(' '),$node);
     while($node->firstChild!==null)$p->insertBefore($node->firstChild,$node);$p->removeChild($node);
 }
 
