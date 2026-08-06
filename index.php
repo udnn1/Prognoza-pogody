@@ -190,6 +190,7 @@ function hasExplicitNoRainSignal($text){
 
 function hasRainSignal($text){$n=toLowercase($text);if(preg_match('/\bbez\s+opad(?:ó|o)w\b/u',$n)===1||preg_match('/\bbrak\s+opad(?:ó|o)w\b/u',$n)===1)return false;return containsAnyKeyword($n,['opady deszczu','deszcz','mżawk','mzawk','ulew']);}
 function hasNoPrecipitationSignal($text){$n=toLowercase($text);return preg_match('/\bbez\s+opad(?:ó|o)w\b/u',$n)===1||preg_match('/\bbrak\s+opad(?:ó|o)w\b/u',$n)===1;}
+function hasExplicitNoStormSignal($text){$n=toLowercase($text);return preg_match('/\b(?:bez|brak)\b[^.!?]*\b(?:burz|piorun)/u',$n)===1||preg_match('/\bburz\w*\s+(?:nie\s+b(?:ę|e)d|nie\s+wyst(?:ą|a)p|si(?:ę|e)\s+nie\s+spodziew)/u',$n)===1;}
 function removeNonLocalForecastContext($text){
     $text=(string)$text;$resume='(?=\b(?:nadal|temperatura|wiatr|ciśnienie|cisnienie)\b|\btemp\.?\s|$)';
     $nonLocal='(?:na\s+wschodzie(?:\s+polski)?|nad\s+morzem|poza\s+regionem|w\s+innych\s+regionach)';
@@ -215,7 +216,7 @@ function hasStrongMorningSunSignal($text){return containsAnyKeyword(toLowercase(
 function hasLessSunSignal($text){$n=toLowercase($text);if(hasLimitedCloudIncreaseSignal($n))return false;return containsAnyKeyword($n,['mniej słońca','mniej slonca','mniej rozpogodzeń','mniej rozpogodzen','mało słońca','malo slonca','zachmurzenie wzrośnie','zachmurzenie wzrosnie','więcej chmur','wiecej chmur','bez słońca','bez slonca']);}
 
 function getForecastTheme($text){
-    $n=toLowercase($text);$local=removeNonLocalForecastContext($n);$no=hasNoPrecipitationSignal($local)||hasExplicitNoRainSignal($local);$clear=hasClearSkySignal($local);$storm=containsAnyKeyword($local,['burz','piorun']);$morning=hasStrongMorningSunSignal($local);$rain=!$no&&hasRainSignal($local);
+    $n=toLowercase($text);$local=removeNonLocalForecastContext($n);$no=hasNoPrecipitationSignal($local)||hasExplicitNoRainSignal($local);$clear=hasClearSkySignal($local);$storm=containsAnyKeyword($local,['burz','piorun'])&&!hasExplicitNoStormSignal($local);$morning=hasStrongMorningSunSignal($local);$rain=!$no&&hasRainSignal($local);
     if(!$rain&&((hasPositiveSunSignal($local)&&!hasLessSunSignal($local)&&!$storm)||($morning&&!$storm)))return getSunnyForecastTheme();
     $themes=[
         ['keywords'=>['burz','piorun'],'icon'=>'storm','label'=>'Burzowo','panel_classes'=>'bg-indigo-500 text-white shadow-indigo-500/25','chip_classes'=>'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200','surface_classes'=>'border-indigo-200/70 bg-indigo-50/55','accent_classes'=>'from-indigo-500 via-violet-500 to-sky-500'],
@@ -228,7 +229,7 @@ function getForecastTheme($text){
         getSunnyForecastTheme()
     ];
     foreach($themes as$t){
-        if($no&&$t['icon']==='rain')continue;if($clear&&in_array($t['icon'],['rain','storm','fog'],true))continue;
+        if($no&&$t['icon']==='rain')continue;if($clear&&in_array($t['icon'],['rain','storm','fog'],true))continue;if($t['icon']==='storm'&&hasExplicitNoStormSignal($local))continue;
         if($t['icon']==='cloud'&&!hasCloudinessSignal($local))continue;
         if($t['icon']==='wind'&&!hasWindySignal($local))continue;
         if($t['icon']==='snow'){foreach(['słońc','slonc','słonecz','slonecz','pogodn','bezchmurn','słonecznie','slonecznie']as$sk)if(strpos($local,$sk)!==false)continue 2;}
@@ -245,7 +246,7 @@ function deduplicateSignals($signals){$seen=[];$out=[];foreach($signals as$s){$k
 function getSunnySignals(){return[['icon'=>'trend-up','label'=>'Trend: poprawa','classes'=>'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200'],['icon'=>'sun','label'=>'Słonecznie','classes'=>'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200']];}
 
 function getForecastSignals($text,$theme){
-    $n=toLowercase(removeBoilerplateText($text));$local=removeNonLocalForecastContext($n);$no=hasNoPrecipitationSignal($local)||hasExplicitNoRainSignal($local);$clear=hasClearSkySignal($local);$lowCloud=hasLowCloudSignal($local);$cloudy=hasCloudinessSignal($local);$signals=[];$morning=hasStrongMorningSunSignal($local);$rain=!$no&&hasRainSignal($local);$storm=containsAnyKeyword($local,['burz','piorun']);
+    $n=toLowercase(removeBoilerplateText($text));$local=removeNonLocalForecastContext($n);$no=hasNoPrecipitationSignal($local)||hasExplicitNoRainSignal($local);$clear=hasClearSkySignal($local);$lowCloud=hasLowCloudSignal($local);$cloudy=hasCloudinessSignal($local);$signals=[];$morning=hasStrongMorningSunSignal($local);$rain=!$no&&hasRainSignal($local);$storm=containsAnyKeyword($local,['burz','piorun'])&&!hasExplicitNoStormSignal($local);
     $sunny=!$rain&&!$storm&&($morning||(hasPositiveSunSignal($local)&&!hasLessSunSignal($local)));
     if($sunny){foreach(getSunnySignals()as$s)$signals[]=$s;}
     elseif(containsAnyKeyword($local,['ociepl','cieplej','wzrost temperatur','coraz cieplej','wyzsza temperatur','wyższa temperatur'])){
